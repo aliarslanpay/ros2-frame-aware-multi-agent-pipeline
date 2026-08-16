@@ -1,0 +1,12 @@
+build/
+install/
+log/
+build-tsan/
+install-tsan/
+log-tsan/
+.vscode/
+.idea/
+compile_commands.json
+CMakeUserPresets.json
+*.user
+.DS_Store
