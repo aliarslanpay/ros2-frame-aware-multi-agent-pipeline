@@ -31,7 +31,7 @@ ProcessResult FrameAwareStateProcessor::process(
   return {std::move(normalization), update};
 }
 
-std::vector<AgentSnapshot> FrameAwareStateProcessor::snapshot(
+std::vector<CachedAgentSnapshot> FrameAwareStateProcessor::snapshot(
   const std::vector<std::string> & agent_ids,
   const SteadyTimePoint now,
   const std::chrono::milliseconds stale_timeout) const

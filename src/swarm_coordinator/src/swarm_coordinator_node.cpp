@@ -18,7 +18,9 @@
 #include "rclcpp/executors/multi_threaded_executor.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "swarm_coordinator/frame_aware_state_processor.hpp"
+#include "swarm_coordinator/snapshot_message_builder.hpp"
 #include "swarm_interfaces/msg/agent_state.hpp"
+#include "swarm_interfaces/msg/swarm_snapshot.hpp"
 #include "tf2/exceptions.h"
 #include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_listener.h"
@@ -158,6 +160,13 @@ public:
         agent_id.c_str(), topic_name.c_str());
     }
 
+    // A consumer-facing snapshot is a low-rate latest-state view. Reliable
+    // delivery avoids avoidable summary loss, and transient local retains the
+    // newest view for a late-joining subscriber.
+    snapshot_publisher_ = create_publisher<swarm_interfaces::msg::SwarmSnapshot>(
+      "swarm/snapshot",
+      rclcpp::QoS{rclcpp::KeepLast{1}}.reliable().transient_local());
+
     // The timer can overlap agent processing but receives one coherent cache snapshot.
     summary_callback_group_ = create_callback_group(
       rclcpp::CallbackGroupType::MutuallyExclusive);
@@ -291,8 +300,14 @@ private:
     const auto snapshots = state_processor_->snapshot(
       agent_ids_, std::chrono::steady_clock::now(), stale_timeout_);
 
+    const builtin_interfaces::msg::Time creation_time = get_clock()->now();
+    auto snapshot_message = make_swarm_snapshot_message(
+      snapshots, creation_time, target_frame_, snapshot_sequence_++);
+    snapshot_publisher_->publish(snapshot_message);
+
     // The cache mutex is already released. Potentially slow formatting and ROS
-    // logging operate only on immutable snapshot records.
+    // message conversion, publishing, and logging operate only on immutable
+    // snapshot records. The topic and log therefore describe the same view.
     std::ostringstream output;
     output << std::fixed << std::setprecision(2) << "Swarm summary:";
 
@@ -329,6 +344,7 @@ private:
   bool instrument_callbacks_{false};
   std::atomic<std::size_t> active_agent_callbacks_{0};
   std::atomic<std::uint64_t> transform_rejections_{0};
+  std::uint64_t snapshot_sequence_{0};
 
   // TransformListener owns its standard TF subscriptions. Buffer lookups are
   // safe from the different agent callback groups; no cache lock is held while
@@ -343,6 +359,8 @@ private:
   rclcpp::CallbackGroup::SharedPtr summary_callback_group_;
   std::vector<rclcpp::Subscription<swarm_interfaces::msg::AgentState>::SharedPtr>
     subscriptions_;
+  rclcpp::Publisher<swarm_interfaces::msg::SwarmSnapshot>::SharedPtr
+    snapshot_publisher_;
   rclcpp::TimerBase::SharedPtr summary_timer_;
 };
 

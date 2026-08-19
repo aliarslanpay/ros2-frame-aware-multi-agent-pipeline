@@ -34,7 +34,7 @@ swarm_interfaces::msg::AgentState make_state(
   return message;
 }
 
-AgentSnapshot snapshot_for(
+CachedAgentSnapshot snapshot_for(
   const AgentStateCache & cache,
   const std::string & agent_id,
   const SteadyTimePoint now,

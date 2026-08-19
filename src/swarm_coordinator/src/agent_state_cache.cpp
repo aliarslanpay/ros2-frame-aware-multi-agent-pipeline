@@ -80,7 +80,7 @@ UpdateResult AgentStateCache::update(
   return {UpdateStatus::kAccepted, missing_samples};
 }
 
-std::vector<AgentSnapshot> AgentStateCache::snapshot(
+std::vector<CachedAgentSnapshot> AgentStateCache::snapshot(
   const std::vector<std::string> & agent_ids,
   const SteadyTimePoint now,
   const std::chrono::milliseconds stale_timeout) const
@@ -91,11 +91,11 @@ std::vector<AgentSnapshot> AgentStateCache::snapshot(
 
   // Allocate and copy configured IDs before locking. Inside the critical
   // section we only acquire immutable shared_ptr snapshots and calculate age.
-  std::vector<AgentSnapshot> snapshots;
+  std::vector<CachedAgentSnapshot> snapshots;
   snapshots.reserve(agent_ids.size());
   for (const auto & agent_id : agent_ids) {
     snapshots.push_back(
-      AgentSnapshot{agent_id, Freshness::kNeverSeen, nullptr, std::nullopt});
+      CachedAgentSnapshot{agent_id, Freshness::kNeverSeen, nullptr, std::nullopt});
   }
 
   {

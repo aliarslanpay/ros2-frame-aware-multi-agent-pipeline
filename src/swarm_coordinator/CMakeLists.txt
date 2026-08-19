@@ -75,8 +75,24 @@ target_link_libraries(
 )
 ament_target_dependencies(frame_aware_state_processor swarm_interfaces)
 
+add_library(snapshot_message_builder STATIC src/snapshot_message_builder.cpp)
+target_include_directories(snapshot_message_builder
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+ament_target_dependencies(
+  snapshot_message_builder
+  builtin_interfaces
+  swarm_interfaces
+)
+
 add_executable(swarm_coordinator_node src/swarm_coordinator_node.cpp)
-target_link_libraries(swarm_coordinator_node frame_aware_state_processor)
+target_link_libraries(
+  swarm_coordinator_node
+  frame_aware_state_processor
+  snapshot_message_builder
+)
 ament_target_dependencies(
   swarm_coordinator_node
   builtin_interfaces
@@ -142,6 +158,17 @@ if(BUILD_TESTING)
     swarm_interfaces
     tf2
     tf2_geometry_msgs
+  )
+
+  ament_add_gtest(
+    test_snapshot_message_builder
+    test/test_snapshot_message_builder.cpp
+  )
+  target_link_libraries(test_snapshot_message_builder snapshot_message_builder)
+  ament_target_dependencies(
+    test_snapshot_message_builder
+    builtin_interfaces
+    swarm_interfaces
   )
 endif()
 

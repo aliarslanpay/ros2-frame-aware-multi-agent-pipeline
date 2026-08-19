@@ -52,7 +52,7 @@ enum class Freshness
   kStale
 };
 
-struct AgentSnapshot
+struct CachedAgentSnapshot
 {
   std::string agent_id;
   Freshness freshness{Freshness::kNeverSeen};
@@ -74,7 +74,7 @@ public:
     const swarm_interfaces::msg::AgentState & message,
     SteadyTimePoint received_at);
 
-  [[nodiscard]] std::vector<AgentSnapshot> snapshot(
+  [[nodiscard]] std::vector<CachedAgentSnapshot> snapshot(
     const std::vector<std::string> & agent_ids,
     SteadyTimePoint now,
     std::chrono::milliseconds stale_timeout) const;
