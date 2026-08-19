@@ -2,7 +2,7 @@
 
 A C++17/ROS 2 Jazzy pipeline that normalizes timestamped state from multiple
 agents into a common coordinate frame and maintains a concurrency-safe
-latest-state cache.
+latest-state cache with a typed consumer-facing snapshot topic.
 
 ## Project overview
 
@@ -10,7 +10,9 @@ Three parameterized instances of one simulator publish `AgentState` messages
 and TF for independent odometry/body frame pairs. A coordinator validates each
 stream, performs an exact-source-time TF2 lookup, normalizes pose and velocity
 into `map`, and stores only accepted state. Periodic summaries classify each
-configured agent as `NEVER_SEEN`, `FRESH`, or `STALE`.
+configured agent as `NEVER_SEEN`, `FRESH`, or `STALE`. Each timer callback
+publishes that coherent view as `swarm_interfaces/msg/SwarmSnapshot` on
+`/swarm/snapshot` and retains the existing human-readable log summary.
 
 This repository focuses on the data-processing boundary between per-agent
 state producers and a common-frame consumer. It does not implement estimation,
@@ -19,7 +21,7 @@ navigation, task allocation, or vehicle control.
 ## Key engineering features
 
 - C++17 nodes and reusable processing components on ROS 2 Jazzy
-- Custom `swarm_interfaces/msg/AgentState` contract
+- Custom `AgentState`, `AgentSnapshot`, and `SwarmSnapshot` contracts
 - Three namespaced agent publishers built from one executable
 - Deterministic straight-line and coordinated-turn motion
 - Per-agent `odom` and `base_link` frames with TF2 publication
@@ -27,6 +29,7 @@ navigation, task allocation, or vehicle control.
 - `SensorDataQoS` for freshness-oriented state streams
 - Configurable `MultiThreadedExecutor` with per-agent callback groups
 - Mutex-protected immutable cache records and coherent snapshots
+- Structured `/swarm/snapshot` output with reliable, transient-local QoS
 - Identity, frame, quaternion, timestamp, and sequence validation
 - Sequence-gap detection, controlled dropout, and stale-state classification
 - Unit, concurrency, stress, and frame-processing tests
@@ -41,7 +44,9 @@ flowchart TD
     C --> D["TF2-backed frame normalizer"]
     T["TF2 buffer"] --> D
     D --> E["Validation and latest-state cache"]
-    E --> F["Coherent summary output"]
+    E --> F["One coherent cache view"]
+    F --> G["Typed snapshot topic"]
+    F --> H["Log summary"]
 ```
 
 Normalization is deliberately upstream of cache mutation. A sample with a
@@ -56,10 +61,10 @@ See [Architecture](docs/architecture.md),
 
 | Package | Responsibility |
 | --- | --- |
-| `swarm_interfaces` | Frame-aware `AgentState` message contract |
+| `swarm_interfaces` | Frame-aware state and structured snapshot contracts |
 | `swarm_core` | Reusable source-timestamp ordering policy |
 | `agent_simulator` | Deterministic state and TF publisher |
-| `swarm_coordinator` | Frame normalization, validation, cache, executor policy, and summaries |
+| `swarm_coordinator` | Frame normalization, validation, cache, executor policy, typed snapshots, and log summaries |
 | `swarm_bringup` | Multi-agent launch configuration |
 
 ## Requirements
@@ -102,9 +107,10 @@ colcon test
 colcon test-result --verbose
 ```
 
-The repository contains 29 GTest cases across five test executables. They cover
-source ordering, cache and freshness invariants, concurrent readers/writers,
-frame validation and transformation, and the normalizer-to-cache boundary.
+The deterministic GTest suites cover source ordering, cache and freshness
+invariants, concurrent readers/writers, frame validation and transformation,
+the normalizer-to-cache boundary, and structured snapshot conversion including
+freshness, ordering, timestamps, sequence metadata, and duration edge cases.
 
 ## Run
 
@@ -120,6 +126,18 @@ Swarm summary: agent_1=[FRESH seq=... frame=map p=(...)] agent_2=[FRESH ...]
 
 A small number of transform rejections may occur during startup before static
 TF data reaches the coordinator. Later samples should be accepted.
+
+In a second terminal, source ROS 2 and this workspace, then inspect the typed
+consumer-facing output:
+
+```bash
+ros2 topic info /swarm/snapshot --verbose
+ros2 topic echo /swarm/snapshot
+```
+
+The topic uses keep-last depth 1, reliable delivery, and transient-local
+durability. Unlike the high-rate best-effort input streams, it is a low-rate
+latest-state view intended for downstream consumers and late joiners.
 
 ## Controlled dropout demonstration
 
@@ -184,11 +202,13 @@ TSAN_OPTIONS=halt_on_error=1:second_deadlock_stack=1 \
 ## Design decisions
 
 - `SensorDataQoS` favors recent state over retransmission of old samples.
+- The snapshot output uses reliable, transient-local keep-last-1 QoS because
+  it is a low-rate aggregate view rather than high-rate sensor telemetry.
 - One `MutuallyExclusive` callback group per agent permits cross-agent
   parallelism without same-agent callback overlap.
 - Immutable cache records keep post-lock reads safe and lock hold times short.
 - One snapshot API binds state, receipt time, age, and freshness to a coherent
-  cache view.
+  cache view; the typed topic and log summary are generated from that same view.
 - TF lookup uses the message source timestamp; zero/latest timestamps are
   rejected.
 - Pose receives translation and rotation, while the project-defined velocity
@@ -204,6 +224,9 @@ TSAN_OPTIONS=halt_on_error=1:second_deadlock_stack=1 \
 - Unavailable transforms cause immediate sample rejection; there is no delayed
   message queue.
 - Health is a coarse simulated field, not a structured diagnostics system.
+- Structured snapshot conversion has deterministic unit coverage, but
+  launch-based publisher/subscriber integration testing is intentionally not
+  included yet.
 - The motion model is deterministic test input, not vehicle dynamics.
 - The pipeline is not a state estimator, navigation stack, swarm controller,
   sensor-fusion system, or hard real-time executor.

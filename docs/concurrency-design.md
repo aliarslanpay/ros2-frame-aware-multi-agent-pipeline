@@ -5,7 +5,8 @@
 The coordinator runs in a configurable `MultiThreadedExecutor`, with four
 workers by default. Each agent subscription owns a dedicated
 `MutuallyExclusive` callback group, and the summary timer owns a separate
-group.
+group. That timer publishes the structured snapshot and writes the log summary
+in one callback.
 
 This topology permits callbacks for different agents to overlap while
 preventing two callbacks for the same agent from executing concurrently.
@@ -29,8 +30,8 @@ A single mutex is appropriate for the current small membership because:
 - per-agent locks would add lock-ordering complexity;
 - one low-rate reader does not justify `std::shared_mutex` overhead.
 
-TF lookup, quaternion work, ROS message allocation/copying, formatting, and
-logging occur outside the cache lock.
+TF lookup, quaternion work, structured ROS message conversion and publishing,
+formatting, and logging occur outside the cache lock.
 
 ## Immutable records
 
@@ -47,7 +48,9 @@ summary from observing fields while a writer mutates them in place.
 `snapshot()` returns, for every configured agent, the state pointer, receipt
 age, and `NEVER_SEEN`/`FRESH`/`STALE` classification calculated from one
 captured time. Copying the immutable pointers and calculating ages happen under
-one lock; all output formatting happens after release.
+one lock; typed message creation, publishing, and output formatting happen
+after release. Both consumer-facing outputs therefore use the same immutable
+view rather than making independent cache reads.
 
 Separate `find()` and `freshness()` calls would allow an update between the two
 reads and could pair an older message with a newer receipt time. The single API

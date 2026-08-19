@@ -26,6 +26,12 @@ The simulator publishes `map -> odom` as static TF and `odom -> base_link` as
 dynamic TF. The dynamic transform and `AgentState` share one kinematic sample
 and ROS timestamp.
 
+In the consumer-facing `SwarmSnapshot`, the top-level header describes snapshot
+creation time and the configured target frame. A nested accepted `AgentState`
+retains its original source timestamp while its `header.frame_id` remains the
+normalized target frame. These two timestamps answer different questions and
+must not be substituted for one another.
+
 ## Timestamp-aware lookup
 
 `StateFrameNormalizer` derives the expected source and child frames from the
