@@ -1,5 +1,7 @@
 # ROS 2 Frame-Aware Multi-Agent State Pipeline
 
+[![ROS 2 Jazzy CI](https://github.com/aliarslanpay/ros2-frame-aware-multi-agent-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/aliarslanpay/ros2-frame-aware-multi-agent-pipeline/actions/workflows/ci.yml)
+
 A C++17/ROS 2 Jazzy pipeline that normalizes timestamped state from multiple
 agents into a common coordinate frame and maintains a concurrency-safe
 latest-state cache with a typed consumer-facing snapshot topic.
