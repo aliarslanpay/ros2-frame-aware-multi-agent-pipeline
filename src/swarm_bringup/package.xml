@@ -15,6 +15,12 @@
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>swarm_coordinator</exec_depend>
 
+  <test_depend>ament_cmake_ros</test_depend>
+  <test_depend>launch_testing</test_depend>
+  <test_depend>launch_testing_ament_cmake</test_depend>
+  <test_depend>rclpy</test_depend>
+  <test_depend>swarm_interfaces</test_depend>
+
   <export>
     <build_type>ament_cmake</build_type>
   </export>

@@ -45,6 +45,8 @@ def generate_launch_description():
     coordinator_executor_threads = LaunchConfiguration(
         "coordinator_executor_threads"
     )
+    summary_period_ms = LaunchConfiguration("summary_period_ms")
+    stale_timeout_ms = LaunchConfiguration("stale_timeout_ms")
     instrument_callbacks = LaunchConfiguration("instrument_callbacks")
     processing_delay_ms = LaunchConfiguration("processing_delay_ms")
 
@@ -119,8 +121,12 @@ def generate_launch_description():
             {
                 "agent_ids": [config["agent_id"] for config in agent_configs],
                 "target_frame": "map",
-                "summary_period_ms": 1000,
-                "stale_timeout_ms": 1500,
+                "summary_period_ms": ParameterValue(
+                    summary_period_ms, value_type=int
+                ),
+                "stale_timeout_ms": ParameterValue(
+                    stale_timeout_ms, value_type=int
+                ),
                 "executor_threads": ParameterValue(
                     coordinator_executor_threads, value_type=int
                 ),
@@ -148,6 +154,22 @@ def generate_launch_description():
                 "coordinator_executor_threads",
                 default_value="4",
                 description="Worker-thread count for the coordinator executor.",
+            ),
+            DeclareLaunchArgument(
+                "summary_period_ms",
+                default_value="1000",
+                description=(
+                    "Period for structured snapshots and log summaries in "
+                    "milliseconds."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "stale_timeout_ms",
+                default_value="1500",
+                description=(
+                    "Receipt-age threshold for classifying accepted state as "
+                    "stale, in milliseconds."
+                ),
             ),
             DeclareLaunchArgument(
                 "instrument_callbacks",

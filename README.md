@@ -33,6 +33,7 @@ navigation, task allocation, or vehicle control.
 - Identity, frame, quaternion, timestamp, and sequence validation
 - Sequence-gap detection, controlled dropout, and stale-state classification
 - Unit, concurrency, stress, and frame-processing tests
+- Launch-based typed-output integration testing of normal and dropout flows
 - Optional ThreadSanitizer instrumentation
 
 ## Architecture
@@ -65,7 +66,7 @@ See [Architecture](docs/architecture.md),
 | `swarm_core` | Reusable source-timestamp ordering policy |
 | `agent_simulator` | Deterministic state and TF publisher |
 | `swarm_coordinator` | Frame normalization, validation, cache, executor policy, typed snapshots, and log summaries |
-| `swarm_bringup` | Multi-agent launch configuration |
+| `swarm_bringup` | Multi-agent launch configuration and end-to-end launch test |
 
 ## Requirements
 
@@ -107,10 +108,49 @@ colcon test
 colcon test-result --verbose
 ```
 
-The deterministic GTest suites cover source ordering, cache and freshness
-invariants, concurrent readers/writers, frame validation and transformation,
-the normalizer-to-cache boundary, and structured snapshot conversion including
-freshness, ordering, timestamps, sequence metadata, and duration edge cases.
+Test counts are reported by category because GTest cases, Python unittest
+methods, CTest targets, and `colcon test-result` entries are different units:
+
+- 37 GTest cases across six C++ GTest executables cover source ordering, cache
+  and freshness invariants, concurrent readers/writers, frame validation and
+  transformation, the normalizer-to-cache boundary, and structured snapshot
+  conversion.
+- One `launch_testing` target starts the installed production launch and runs
+  one active end-to-end scenario plus one post-shutdown process-exit check.
+
+Run only the multi-process integration test with live console output:
+
+```bash
+colcon test \
+  --packages-select swarm_bringup \
+  --ctest-args -R test_multi_agent_pipeline --output-on-failure \
+  --event-handlers console_direct+
+
+colcon test-result --verbose
+```
+
+After building and sourcing the workspace, the launch test can also be invoked
+directly from the repository root:
+
+```bash
+ROS_DOMAIN_ID=73 \
+  launch_test src/swarm_bringup/test/test_multi_agent_pipeline.py
+```
+
+For failure diagnosis, inspect both the package-level colcon output and the
+CTest detail:
+
+```bash
+sed -n '1,260p' log/latest_test/swarm_bringup/stdout_stderr.log
+sed -n '1,260p' build/swarm_bringup/Testing/Temporary/LastTest.log
+```
+
+The test includes `multi_agent_pipeline.launch.py` rather than duplicating the
+graph definition. It subscribes to `/swarm/snapshot` with matching reliable,
+transient-local QoS and conditionally waits for a complete FRESH snapshot,
+agent 2 dropout, retained-state STALE classification, and continued snapshot
+sequencing. The isolated test runner prevents dependence on the caller's
+default ROS graph.
 
 ## Run
 
@@ -224,9 +264,6 @@ TSAN_OPTIONS=halt_on_error=1:second_deadlock_stack=1 \
 - Unavailable transforms cause immediate sample rejection; there is no delayed
   message queue.
 - Health is a coarse simulated field, not a structured diagnostics system.
-- Structured snapshot conversion has deterministic unit coverage, but
-  launch-based publisher/subscriber integration testing is intentionally not
-  included yet.
 - The motion model is deterministic test input, not vehicle dynamics.
 - The pipeline is not a state estimator, navigation stack, swarm controller,
   sensor-fusion system, or hard real-time executor.

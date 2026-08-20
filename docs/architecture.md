@@ -20,7 +20,8 @@ fully qualified topics from its configured `agent_ids` list.
 - `agent_simulator` produces deterministic motion, state, and TF.
 - `swarm_coordinator` owns normalization, validation, caching, freshness,
   structured snapshot publication, and log summary behavior.
-- `swarm_bringup` supplies one reproducible three-agent deployment.
+- `swarm_bringup` supplies one reproducible three-agent deployment and reuses
+  it for launch-based end-to-end verification.
 
 This split keeps the message contract and pure ordering rule independent from
 the simulator and coordinator applications.
@@ -97,6 +98,22 @@ Negative ages clamp to zero and values beyond the message range saturate.
 state at its default invalid value. Consumers must inspect `has_state` before
 using that nested state. `FRESH` and `STALE` entries have `has_state=true`.
 
+## End-to-end verification
+
+The launch integration test includes the installed production
+`multi_agent_pipeline.launch.py`; it does not maintain a second copy of agent
+configuration or graph topology. Test-only launch arguments shorten the
+snapshot period and stale timeout while preserving production defaults.
+
+An isolated ROS domain starts the three agent processes and coordinator. A
+matching reliable, transient-local `rclpy` subscription validates the typed
+snapshot contract through the normal flow and the existing agent 2 dropout
+flow. Condition-based waits cover graph discovery, complete FRESH state,
+ordered target-frame-normalized payloads, nonzero source timestamps, monotonic
+snapshot sequence, retained last state during FRESH-to-STALE transition, and
+continued snapshots after dropout. Every wait and the CTest target have bounded
+timeouts; post-shutdown assertions report unexpected process exit codes.
+
 ## Failure handling
 
 The pipeline rejects identity mismatches, invalid frames or quaternions,
@@ -118,5 +135,4 @@ offset estimation, or coordinator failover.
 
 The snapshot topic is a latest-state observation API, not a command, control,
 or diagnostics interface. No claim is made about state estimation, navigation,
-distributed coordination, or hard real-time execution. Launch-based
-publisher/subscriber integration testing is reserved for a later stage.
+distributed coordination, or hard real-time execution.

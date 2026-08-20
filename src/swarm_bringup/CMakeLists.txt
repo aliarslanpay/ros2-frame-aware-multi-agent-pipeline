@@ -8,5 +8,16 @@ install(
   DESTINATION share/${PROJECT_NAME}
 )
 
-ament_package()
+if(BUILD_TESTING)
+  find_package(ament_cmake_ros REQUIRED)
+  find_package(launch_testing_ament_cmake REQUIRED)
 
+  add_launch_test(
+    test/test_multi_agent_pipeline.py
+    TARGET test_multi_agent_pipeline
+    RUNNER "${ament_cmake_ros_DIR}/run_test_isolated.py"
+    TIMEOUT 35
+  )
+endif()
+
+ament_package()
