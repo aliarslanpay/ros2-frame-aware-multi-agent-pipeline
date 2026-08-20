@@ -152,6 +152,16 @@ agent 2 dropout, retained-state STALE classification, and continued snapshot
 sequencing. The isolated test runner prevents dependence on the caller's
 default ROS graph.
 
+## Continuous integration
+
+The [ROS 2 Jazzy CI workflow](.github/workflows/ci.yml) runs on Ubuntu 24.04
+for pushes and pull requests targeting `main`, and can also be started
+manually. It installs ROS 2 Jazzy and declared workspace dependencies, performs
+a clean symlink build, and runs the complete test suite, including the
+multi-process launch test and its post-shutdown assertions. Failed runs retain
+focused colcon, CTest, and test-result logs as a short-lived diagnostic
+artifact.
+
 ## Run
 
 ```bash
